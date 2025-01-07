@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package game;
+option go_package = "game_backend/";
+
+service GameService {
+  rpc CreateGame(CreateGameRequest) returns (CreateGameResponse);
+  rpc JoinGame(JoinGameRequest) returns (JoinGameResponse);
+  rpc UpdateGameState(UpdateGameStateRequest) returns (UpdateGameStateResponse);
+  rpc StreamGameUpdates(StreamGameUpdatesRequest) returns (stream StreamGameUpdatesResponse);
+}
+
+message CreateGameRequest {
+  string player_name = 1;
+}
+
+message CreateGameResponse {
+  string game_id = 1;
+}
+
+message JoinGameRequest {
+  string game_id = 1;
+  string player_name = 2;
+}
+
+message JoinGameResponse {
+  string status = 1;
+}
+
+message UpdateGameStateRequest {
+  string game_id = 1;
+  string player_name = 2;
+  string new_state = 3;
+}
+
+message UpdateGameStateResponse {
+  string status = 1;
+}
+
+message StreamGameUpdatesRequest {
+  string game_id = 1;
+  string player_name = 2;
+}
+
+message StreamGameUpdatesResponse {
+  string update = 1;
+}
