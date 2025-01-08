@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"sync"
 
 	// "time"
@@ -27,6 +28,8 @@ type GameState struct {
 	GameOver bool
 	NotifyA  chan string
 	NotifyB  chan string
+	NumbersA []int
+	NumbersB []int
 }
 
 func (s *GameServer) CreateGame(ctx context.Context, req *game.CreateGameRequest) (*game.CreateGameResponse, error) {
@@ -96,6 +99,14 @@ func (s *GameServer) UpdateGameState(ctx context.Context, req *game.UpdateGameSt
 
 	log.Printf("Game ID: %s updated by Player: %s, New State: %s", req.GameId, req.PlayerName, req.NewState)
 
+	num, _ := strconv.Atoi(req.NewState)
+	if req.PlayerName == gameState.PlayerA {
+		gameState.NumbersA = append(gameState.NumbersA, num)
+
+	} else if req.PlayerName == gameState.PlayerB {
+		gameState.NumbersB = append(gameState.NumbersB, num)
+	}
+
 	// Notify both players automatically
 	go func() {
 		if gameState.PlayerA != "" {
@@ -110,21 +121,74 @@ func (s *GameServer) UpdateGameState(ctx context.Context, req *game.UpdateGameSt
 		}
 	}()
 
-	// Check if the game is over
-	if checkGameOver(gameState.State) {
-		gameState.GameOver = true
+	isGameOver, result := checkGameOver(gameState.NumbersA, gameState.NumbersB, gameState.PlayerA, gameState.PlayerB)
+	if isGameOver {
 		go func() {
-			gameState.NotifyA <- "Game Over!"
-			gameState.NotifyB <- "Game Over!"
+			gameState.NotifyA <- result
+			gameState.NotifyB <- result
 		}()
+		fmt.Println(result) // Output: "Player A wins!"
 	}
+	// Check if the game is over
+	// if checkGameOver(gameState.NumbersA, gameState.NumbersB) {
+	// 	gameState.GameOver = true
+	// 	go func() {
+	// 		gameState.NotifyA <- "Game Over!"
+	// 		gameState.NotifyB <- "Game Over!"
+	// 	}()
+	// }
 
 	return &game.UpdateGameStateResponse{Status: "State updated successfully"}, nil
 }
 
-func checkGameOver(state string) bool {
-	// Placeholder logic to check if the game is over
-	return false
+func checkGameOver(numbersA []int, numbersB []int, playerA string, playerB string) (bool, string) {
+
+	// Define the winning combinations
+	winningCombinations := [][]int{
+		{1, 2, 3}, // Top row
+		{4, 5, 6}, // Middle row
+		{7, 8, 9}, // Bottom row
+		{1, 4, 7}, // Left column
+		{2, 5, 8}, // Middle column
+		{3, 6, 9}, // Right column
+		{1, 5, 9}, // Diagonal top-left to bottom-right
+		{3, 5, 7}, // Diagonal top-right to bottom-left
+	}
+
+	// Helper function to check if a slice contains a combination
+	containsCombination := func(playerMoves []int, combination []int) bool {
+		count := 0
+		for _, pos := range combination {
+			for _, move := range playerMoves {
+				if pos == move {
+					count++
+					break
+				}
+			}
+		}
+		return count == 3
+	}
+	// Check if Player A wins
+	for _, combo := range winningCombinations {
+		if containsCombination(numbersA, combo) {
+			return true, playerA + "::wins"
+		}
+	}
+
+	// Check if Player B wins
+	for _, combo := range winningCombinations {
+		if containsCombination(numbersB, combo) {
+			return true, playerB + "::wins"
+		}
+	}
+
+	// Check for a draw
+	if len(numbersA)+len(numbersB) == 9 {
+		return true, "d::draw"
+	}
+
+	// Game is not over
+	return false, ""
 }
 
 func (s *GameServer) StreamGameUpdates(req *game.StreamGameUpdatesRequest, stream game.GameService_StreamGameUpdatesServer) error {
